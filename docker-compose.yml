@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0.35
+    container_name: product_manager_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: product_manager
+      MYSQL_USER: productuser
+      MYSQL_PASSWORD: productpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - product-manager-network
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+    command: --default-authentication-plugin=mysql_native_password
+
+  # Product Manager API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: product_manager_api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/product_manager?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: productuser
+      SPRING_DATASOURCE_PASSWORD: productpass
+      SPRING_PROFILES_ACTIVE: mysql
+      JWT_SECRET: MySecureSecretKeyForProductManagerAPI123456789XYZ
+      JWT_EXPIRATION: 3600000
+      JWT_REFRESH_TOKEN_EXPIRATION: 604800000
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - product-manager-network
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database (Optional)
+  postgres:
+    image: postgres:15-alpine
+    container_name: product_manager_postgres
+    environment:
+      POSTGRES_DB: product_manager
+      POSTGRES_USER: productuser
+      POSTGRES_PASSWORD: productpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - product-manager-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U productuser -d product_manager" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - postgres
+
+  # Adminer for Database Management (Optional)
+  adminer:
+    image: adminer:latest
+    container_name: product_manager_adminer
+    ports:
+      - "8888:8080"
+    depends_on:
+      - mysql
+    networks:
+      - product-manager-network
+    profiles:
+      - admin
+
+volumes:
+  mysql_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  product-manager-network:
+    driver: bridge

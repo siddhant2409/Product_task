@@ -1,0 +1,15 @@
+target/
+src/
+pom.xml
+.git/
+.github/
+.mvn/
+mvnw
+mvnw.cmd
+.gitignore
+README.md
+LICENSE
+node_modules/
+.vscode/
+.idea/
+.DS_Store
